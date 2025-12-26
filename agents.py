@@ -225,6 +225,7 @@ def TableDrivenVacuumAgent():
              ((loc_B, 'Dirty'), (loc_B, 'Clean')): 'Left',
              ((loc_A, 'Dirty'), (loc_A, 'Clean'), (loc_B, 'Dirty')): 'Suck',
              ((loc_B, 'Dirty'), (loc_B, 'Clean'), (loc_A, 'Dirty')): 'Suck'}
+    
     return Agent(TableDrivenAgentProgram(table))
 
 

@@ -678,7 +678,7 @@ def expr(x):
     >>> expr('P & Q ==> Q')
     ((P & Q) ==> Q)
     """
-    return eval(expr_handle_infix_ops(x), defaultkeydict(Symbol)) if isinstance(x, str) else x
+    return eval(expr_handle_infix_ops(x), defaultkeydict(Symbol)) if isinstance(x, str) else x # type: ignore
 
 
 infix_ops = '==> <== <=>'.split()
@@ -701,7 +701,7 @@ class defaultkeydict(collections.defaultdict):
     """
 
     def __missing__(self, key):
-        self[key] = result = self.default_factory(key)
+        self[key] = result = self.default_factory(key) # type: ignore
         return result
 
 
