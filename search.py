@@ -1019,6 +1019,7 @@ class Graph:
 
     def __init__(self, graph_dict=None, directed=True):
         self.graph_dict = graph_dict or {}
+        self.locations = {}  # node locations for heuristic functions
         self.directed = directed
         if not directed:
             self.make_undirected()
