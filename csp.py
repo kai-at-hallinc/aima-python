@@ -42,6 +42,7 @@ class CSP(search.Problem):
                                 conflict with var=val
         curr_domains[var]       Slot: remaining consistent values for var
                                 Used by constraint propagation routines.
+
     The following methods are used only by graph_search and tree_search:
         actions(state)          Return a list of actions
         result(state, action)   Return a successor of state
@@ -116,8 +117,7 @@ class CSP(search.Problem):
     # These are for constraint propagation
 
     def support_pruning(self):
-        """Make sure we can prune values from domains. (We want to pay
-        for this only if we use it.)"""
+        """Make sure we can prune values from domains."""
         if self.curr_domains is None:
             self.curr_domains = {v: list(self.domains[v]) for v in self.variables}
 
@@ -159,7 +159,6 @@ class CSP(search.Problem):
 
 # ______________________________________________________________________________
 # Constraint Propagation with AC3
-
 
 def no_arc_heuristic(csp, queue):
     return queue
@@ -342,7 +341,6 @@ def AC4(csp, queue=None, removals=None, arc_heuristic=dom_j_up):
 
 # Variable ordering
 
-
 def first_unassigned_variable(assignment, csp):
     """The default variable order."""
     return first([var for var in csp.variables if var not in assignment])
@@ -360,9 +358,7 @@ def num_legal_values(csp, var, assignment):
     else:
         return count(csp.nconflicts(var, val, assignment) == 0 for val in csp.domains[var])
 
-
 # Value ordering
-
 
 def unordered_domain_values(var, assignment, csp):
     """The default value order."""
@@ -376,10 +372,8 @@ def lcv(var, assignment, csp):
 
 # Inference
 
-
 def no_inference(csp, var, value, assignment, removals):
     return True
-
 
 def forward_checking(csp, var, value, assignment, removals):
     """Prune neighbor values inconsistent with var=value."""
@@ -393,7 +387,6 @@ def forward_checking(csp, var, value, assignment, removals):
                 return False
     return True
 
-
 def mac(csp, var, value, assignment, removals, constraint_propagation=AC3b):
     """Maintain arc consistency."""
     return constraint_propagation(csp, {(X, var) for X in csp.neighbors[var]}, removals)
@@ -401,16 +394,17 @@ def mac(csp, var, value, assignment, removals, constraint_propagation=AC3b):
 
 # The search, proper
 
-
-def backtracking_search(csp, select_unassigned_variable=first_unassigned_variable,
-                        order_domain_values=unordered_domain_values, inference=no_inference):
-    """[Figure 6.5]"""
-
+def backtracking_search(
+    csp,
+    select_unassigned_variable=first_unassigned_variable,
+    order_domain_values=unordered_domain_values, inference=no_inference
+):
+    # recursive backtracker
     def backtrack(assignment):
         if len(assignment) == len(csp.variables):
             return assignment
-        var = select_unassigned_variable(assignment, csp)
-        for value in order_domain_values(var, assignment, csp):
+        var = select_unassigned_variable(assignment, csp)   # select variable to handle
+        for value in order_domain_values(var, assignment, csp): # try values
             if 0 == csp.nconflicts(var, value, assignment):
                 csp.assign(var, value, assignment)
                 removals = csp.suppose(var, value)
@@ -430,14 +424,15 @@ def backtracking_search(csp, select_unassigned_variable=first_unassigned_variabl
 # ______________________________________________________________________________
 # Min-conflicts Hill Climbing search for CSPs
 
-
 def min_conflicts(csp, max_steps=100000):
     """Solve a CSP by stochastic Hill Climbing on the number of conflicts."""
-    # Generate a complete assignment for all variables (probably with conflicts)
+    
+    # Generate a complete assignment for all variables
     csp.current = current = {}
     for var in csp.variables:
         val = min_conflicts_value(csp, var, current)
         csp.assign(var, val, current)
+
     # Now repeatedly choose a random conflicted variable and change it
     for i in range(max_steps):
         conflicted = csp.conflicted_vars(current)
@@ -578,6 +573,7 @@ def MapColoringCSP(colors, neighbors):
     specified as a string of the form defined by parse_neighbors."""
     if isinstance(neighbors, str):
         neighbors = parse_neighbors(neighbors)
+
     return CSP(list(neighbors.keys()), UniversalDict(colors), neighbors, different_values_constraint)
 
 
@@ -643,9 +639,11 @@ class NQueensCSP(CSP):
                      such that their (x, y) coordinates sum to i
         ups[i]       Number of queens in the / diagonal
                      such that their (x, y) coordinates have x-y+n-1 = i
+    
     We increment/decrement these counts each time a queen is placed/moved from
     a row/diagonal. So moving is O(1), as is nconflicts.  But choosing
     a variable, and a best value for the variable, are each O(n).
+    
     If you want, you can keep track of conflicted variables, then variable
     selection will also be O(1).
     >>> len(backtracking_search(NQueensCSP(8)))

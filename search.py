@@ -11,6 +11,14 @@ from collections import deque
 
 from utils import *
 
+# Optional imports for visualization (notebook support)
+try:
+    import ipywidgets as widgets
+    from IPython.display import display
+    VISUALIZATION_AVAILABLE = True
+except ImportError:
+    VISUALIZATION_AVAILABLE = False
+
 
 class Problem:
     """The abstract class for a formal problem. You should subclass
@@ -692,7 +700,8 @@ def simulated_annealing_full(problem, schedule=exp_schedule()):
 
 
 def and_or_graph_search(problem):
-    """[Figure 4.11]Used when the environment is nondeterministic and completely observable.
+    """[Figure 4.11]
+    Used when the environment is nondeterministic and completely observable.
     Contains OR nodes where the agent is free to choose any action.
     After every action there is an AND node which contains all possible states
     the agent may reach due to stochastic nature of environment.
@@ -1575,3 +1584,50 @@ def compare_graph_searchers():
                                 GraphProblem('Q', 'WA', australia_map)],
                       header=['Searcher', 'romania_map(Arad, Bucharest)',
                               'romania_map(Oradea, Neamt)', 'australia_map'])
+
+
+def visualize_search_steps(problem, algorithm, graph_data, show_map_func):
+    """
+    Interactive step-by-step visualization of search algorithms using ipywidgets slider.
+    
+    Args:
+        problem: The search problem instance (e.g., GraphProblem)
+        algorithm: The search algorithm function that returns (iterations, all_node_colors, node)
+        graph_data: The graph data dictionary containing node positions, colors, etc.
+        show_map_func: The function to display the map (e.g., show_map from notebook.py)
+    
+    Returns:
+        None (displays interactive widget)
+    """
+    if not VISUALIZATION_AVAILABLE:
+        print("Error: ipywidgets not available. Install with: pip install ipywidgets")
+        return
+    
+    all_node_colors = []
+    iterations, all_node_colors, node = algorithm(problem)
+    
+    # Print solution summary
+    if node:
+        solution = node.solution()
+        print(f"Solution found: {problem.initial} → {' → '.join(solution)} → {node.state}")
+        print(f"Path cost: {node.path_cost}")
+        print(f"Total steps: {len(all_node_colors)}")
+        print(f"\nUse slider below to view each step of the search:\n")
+        
+        # Create interactive slider
+        def show_step(step):
+            print(f"Step {step}/{len(all_node_colors)-1}")
+            show_map_func(graph_data, node_colors=all_node_colors[step])
+        
+        slider = widgets.IntSlider(
+            value=0,
+            min=0,
+            max=len(all_node_colors)-1,
+            step=1,
+            description='Step:',
+            continuous_update=False
+        )
+        
+        widgets.interact(show_step, step=slider)
+    else:
+        print("No solution found")
