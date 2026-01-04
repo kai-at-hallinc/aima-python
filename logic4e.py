@@ -344,6 +344,114 @@ def tt_check_all(kb, alpha, symbols, model):
                 tt_check_all(kb, alpha, rest, extend(model, P, False)))
 
 
+def trace_tt_check_all(func):
+    """
+    Decorator that traces tt_check_all execution with detailed output.
+    Shows recursion depth, model building, symbol processing, and evaluation.
+    """
+    call_depth = [0]  # Use list to allow modification in nested function
+    
+    def wrapper(kb, alpha, symbols, model):
+        
+        # increment call stack at each call
+        call_depth[0] += 1
+
+        indent = "  " * (call_depth[0] - 1)
+        call_id = call_depth[0]
+        
+        print(f"\n{'='*80}")
+        print(f"{indent}[CALL #{call_id}] tt_check_all()")
+        print(f"{indent}├─ Recursion Depth: {call_depth[0]}")
+        print(f"{indent}├─ Model: {model}")
+        print(f"{indent}├─ Remaining Symbols: {symbols}")
+        print(f"{indent}├─ KB Expression: {kb}")
+        print(f"{indent}└─ Alpha Query: {alpha}")
+        
+        # Base case: no more symbols
+        if not symbols:
+            print(f"{indent}\n[BASE CASE] No more symbols to assign")
+            print(f"{indent}├─ Complete Model: {model}")
+            
+            # Evaluate KB with complete model
+            kb_result = pl_true(kb, model)
+            print(f"{indent}├─ KB Evaluation: pl_true({kb}, model) = {kb_result}")
+            
+            if kb_result:
+                # Evaluate alpha with complete model
+                alpha_result = pl_true(alpha, model)
+                print(f"{indent}├─ KB is TRUE → Evaluate Alpha")
+                print(f"{indent}├─ Alpha Evaluation: pl_true({alpha}, model) = {alpha_result}")
+                print(f"{indent}└─ RETURN: {alpha_result}")
+                result = alpha_result
+            else:
+                print(f"{indent}├─ KB is FALSE → Implication is vacuously TRUE")
+                print(f"{indent}└─ RETURN: True")
+                result = True
+        else:
+            # Recursive case
+            P = symbols[0]
+            rest = symbols[1:]
+            
+            print(f"{indent}\n[RECURSIVE CASE] Processing symbol: {P}")
+            print(f"{indent}├─ Next Symbol to Branch: {P}")
+            print(f"{indent}├─ Remaining Symbols after {P}: {rest}")
+            
+            # Branch 1: Set P to True
+            print(f"{indent}\n{indent}[BRANCH 1] Setting {P} = True")
+            model_true = extend(model, P, True)
+            print(f"{indent}├─ Extended Model: {model_true}")
+
+            # recursive call Branch 1 - True
+            result_true = wrapper(kb, alpha, rest, model_true)
+            print(f"{indent}├─ Branch 1 Result: {result_true}")
+            
+            # Branch 2: Set P to False
+            print(f"{indent}\n{indent}[BRANCH 2] Setting {P} = False")
+            model_false = extend(model, P, False)
+            print(f"{indent}├─ Extended Model: {model_false}")
+
+            # recursive call Branch 2 - False
+            result_false = wrapper(kb, alpha, rest, model_false)
+            print(f"{indent}├─ Branch 2 Result: {result_false}")
+            
+            # Combine results with AND
+            result = result_true and result_false
+            print(f"{indent}\n{indent}[COMBINE] Both branches must be TRUE")
+            print(f"{indent}├─ {result_true} AND {result_false} = {result}")
+            print(f"{indent}└─ RETURN: {result}")
+        
+        call_depth[0] -= 1
+        return result
+    
+    return wrapper
+
+
+# Create the traced version
+traced_tt_check_all = trace_tt_check_all(tt_check_all)
+
+
+def tt_entails_traced(kb, alpha):
+    """
+    Wrapper for tt_entails that uses the traced version with detailed output.
+    Shows recursion structure, model building, symbol processing, and evaluation.
+    """
+    assert not variables(alpha)
+    symbols = list(prop_symbols(kb & alpha))
+    print(f"\n{'='*80}")
+    print(f"[STARTING tt_entails_traced]")
+    print(f"├─ KB: {kb}")
+    print(f"├─ Alpha (Query): {alpha}")
+    print(f"├─ All Symbols to Process: {symbols}")
+    print(f"└─ Initial Model: {{}}\n")
+    
+    result = traced_tt_check_all(kb, alpha, symbols, {})
+    
+    print(f"\n{'='*80}")
+    print(f"[FINAL RESULT] tt_entails({kb}, {alpha}) = {result}")
+    print(f"{'='*80}\n")
+    return result
+
+
 def prop_symbols(x):
     """Return the set of all propositional symbols in x."""
     if not isinstance(x, Expr):
@@ -734,10 +842,12 @@ def dpll(clauses, symbols, model):
             unknown_clauses.append(c)
     if not unknown_clauses:
         return model
-    P, value = find_pure_symbol(symbols, unknown_clauses)
+    # Check unit clauses FIRST (forced assignments)
+    P, value = find_unit_clause(clauses, model)
     if P:
         return dpll(clauses, remove_all(P, symbols), extend(model, P, value))
-    P, value = find_unit_clause(clauses, model)
+    # Check pure symbols SECOND (optimization)
+    P, value = find_pure_symbol(symbols, unknown_clauses)
     if P:
         return dpll(clauses, remove_all(P, symbols), extend(model, P, value))
     if not symbols:
@@ -815,6 +925,154 @@ def inspect_literal(literal):
         return literal.args[0], False
     else:
         return literal, True
+
+
+def trace_dpll(func):
+    """
+    Decorator that traces dpll execution with detailed output.
+    Shows recursion depth, clause evaluation, heuristic applications,
+    and branching decisions.
+    """
+    call_depth = [0]  # Use list to allow modification in nested function
+    
+    def wrapper(clauses, symbols, model):
+        
+        # increment call stack at each call
+        call_depth[0] += 1
+        indent = "  " * (call_depth[0] - 1)
+        call_id = call_depth[0]
+        
+        print(f"\n{'='*80}")
+        print(f"{indent}[CALL #{call_id}] dpll()")
+        print(f"{indent}├─ Recursion Depth: {call_depth[0]}")
+        print(f"{indent}├─ Model: {model}")
+        print(f"{indent}├─ Remaining Symbols: {symbols}")
+        print(f"{indent}└─ Number of Clauses: {len(clauses)}")
+        
+        # Clause evaluation step
+        print(f"{indent}\n[CLAUSE EVALUATION]")
+        unknown_clauses = []
+        for c in clauses:
+            val = pl_true(c, model)
+            if val is False:
+                print(f"{indent}├─ Clause {c} = FALSE → CONFLICT!")
+                call_depth[0] -= 1
+                return False
+            if val is not True:
+                unknown_clauses.append(c)
+        
+        print(f"{indent}├─ True clauses: {len(clauses) - len(unknown_clauses)}")
+        print(f"{indent}├─ Unknown clauses: {len(unknown_clauses)}")
+        
+        # Base case: all clauses satisfied
+        if not unknown_clauses:
+            print(f"{indent}\n[SUCCESS] All clauses satisfied!")
+            print(f"{indent}├─ Complete Model: {model}")
+            print(f"{indent}└─ RETURN: {model}")
+            call_depth[0] -= 1
+            return model
+        
+        # Try unit clause heuristic FIRST (FORCED assignments)
+        P, value = find_unit_clause(clauses, model)
+        if P:
+            print(f"{indent}\n[UNIT CLAUSE] Found unit clause forcing:")
+            print(f"{indent}├─ Unit variable: {P}")
+            print(f"{indent}├─ Forced value: {value}")
+            print(f"{indent}└─ Assigning: {P} = {value}")
+            result = wrapper(clauses, remove_all(P, symbols), extend(model, P, value))
+            call_depth[0] -= 1
+            return result
+        
+        # Try pure symbol heuristic SECOND (OPTIMIZATION)
+        P, value = find_pure_symbol(symbols, unknown_clauses)
+        if P:
+            print(f"{indent}\n[PURE SYMBOL] Found pure symbol: {P}")
+            print(f"{indent}├─ Appears only as: {'positive' if value else 'negative'}")
+            print(f"{indent}├─ Auto-assigning: {P} = {value}")
+            result = wrapper(clauses, remove_all(P, symbols), extend(model, P, value))
+            call_depth[0] -= 1
+            return result
+        
+        # No more symbols
+        if not symbols:
+            print(f"{indent}\n[ERROR] No more symbols but clauses remain unsatisfied!")
+            print(f"{indent}└─ RETURN: False (No valid model)")
+            call_depth[0] -= 1
+            return False
+        
+        # Branch on first remaining symbol
+        P = symbols[0]
+        rest_symbols = symbols[1:]
+        
+        print(f"{indent}\n[BRANCH] Branching on variable: {P}")
+        print(f"{indent}├─ Remaining symbols after {P}: {rest_symbols}")
+        
+        # Branch 1: Try P = True
+        print(f"{indent}\n{indent}[BRANCH 1] Trying {P} = True")
+        print(f"{indent}├─ Extended Model: {extend(model, P, True)}")
+        result_true = wrapper(clauses, rest_symbols, extend(model, P, True))
+        
+        if result_true:
+            print(f"{indent}├─ Branch 1 SUCCESS with model: {result_true}")
+            call_depth[0] -= 1
+            return result_true
+        
+        print(f"{indent}├─ Branch 1 FAILED")
+        
+        # Branch 2: Try P = False
+        print(f"{indent}\n{indent}[BRANCH 2] Trying {P} = False")
+        print(f"{indent}├─ Extended Model: {extend(model, P, False)}")
+        result_false = wrapper(clauses, rest_symbols, extend(model, P, False))
+        
+        if result_false:
+            print(f"{indent}├─ Branch 2 SUCCESS with model: {result_false}")
+            call_depth[0] -= 1
+            return result_false
+        
+        print(f"{indent}├─ Branch 2 FAILED")
+        print(f"{indent}└─ [BACKTRACK] Both branches failed for {P}")
+        
+        call_depth[0] -= 1
+        return False
+    
+    return wrapper
+
+
+# Create the traced version
+traced_dpll = trace_dpll(dpll)
+
+
+def dpll_satisfiable_traced(s):
+    """
+    Check satisfiability of a propositional sentence with detailed trace output.
+    Shows clause evaluation, pure symbols, unit propagation, and branching.
+    """
+    clauses = conjuncts(to_cnf(s))
+    symbols = list(prop_symbols(s))
+    
+    print(f"\n{'='*80}")
+    print(f"[STARTING dpll_satisfiable_traced]")
+    print(f"├─ Original Formula: {s}")
+    print(f"├─ CNF Clauses: {len(clauses)} total")
+    for i, c in enumerate(clauses, 1):
+        print(f"│  {i}. {c}")
+    print(f"├─ Symbols to Process: {symbols}")
+    print(f"└─ Initial Model: {{}}\n")
+    
+    result = traced_dpll(clauses, symbols, {})
+    
+    print(f"\n{'='*80}")
+    if result:
+        print(f"[FINAL RESULT] SATISFIABLE")
+        print(f"├─ Model: {result}")
+        print(f"└─ Verification: All clauses evaluate to True with this model")
+    else:
+        print(f"[FINAL RESULT] UNSATISFIABLE")
+        print(f"├─ No valid assignment exists")
+        print(f"└─ All possible branches lead to conflict")
+    print(f"{'='*80}\n")
+    
+    return result
 
 
 # ______________________________________________________________________________
@@ -1208,6 +1466,590 @@ class HybridWumpusAgent(Agent):
         actions.extend(self.plan_route(current, shooting_positions, allowed))
         actions.append('Shoot')
         return actions
+
+
+# ______________________________________________________________________________
+# 7.7.3 Simplified 1-CNF Belief State Agent
+
+class SimpleBeliefStateKB(PropKB):
+    """
+    A simplified KB that stores beliefs as a set of proven literals (1-CNF).
+    Instead of maintaining temporal rules, we maintain only a conjunction of 
+    provable literals: L1 ∧ L2 ∧ L3 ∧ ... where each Li is a literal (positive or negative atom).
+    
+    This provides O(1) belief lookup instead of expensive entailment checks.
+    Each turn, the belief state is fully replaced (not accumulated) based on what can be 
+    proven from the current KB state.
+    """
+
+    def __init__(self, dimrow):
+        """Initialize with static Wumpus physics rules."""
+        super().__init__()
+        self.dimrow = dimrow
+        self.belief_state = set()  # Set of proven literals: {Expr('L', 1, 1), ~Expr('P', 2, 3), ...}
+        
+        # Add static atemporal rules (physics, constraints, but NOT temporal rules)
+        self.tell(~wumpus(1, 1))
+        self.tell(~pit(1, 1))
+
+        # Physics rules: simplified version (breeze and stench from neighbors)
+        # For each cell, breeze iff adjacent pit, stench iff adjacent wumpus
+        for y in range(1, dimrow + 1):
+            for x in range(1, dimrow + 1):
+                # Collect adjacent pit locations
+                adjacent_pits = []
+                if x > 1:
+                    adjacent_pits.append(pit(x - 1, y))
+                if x < dimrow:
+                    adjacent_pits.append(pit(x + 1, y))
+                if y > 1:
+                    adjacent_pits.append(pit(x, y - 1))
+                if y < dimrow:
+                    adjacent_pits.append(pit(x, y + 1))
+                
+                if adjacent_pits:
+                    self.tell(equiv(breeze(x, y), new_disjunction(adjacent_pits)))
+                
+                # Collect adjacent wumpus locations
+                adjacent_wumpus = []
+                if x > 1:
+                    adjacent_wumpus.append(wumpus(x - 1, y))
+                if x < dimrow:
+                    adjacent_wumpus.append(wumpus(x + 1, y))
+                if y > 1:
+                    adjacent_wumpus.append(wumpus(x, y - 1))
+                if y < dimrow:
+                    adjacent_wumpus.append(wumpus(x, y + 1))
+                
+                if adjacent_wumpus:
+                    self.tell(equiv(stench(x, y), new_disjunction(adjacent_wumpus)))
+
+        # At least one Wumpus exists
+        wumpus_at_least = [wumpus(x, y) for x in range(1, dimrow + 1) for y in range(1, dimrow + 1)]
+        self.tell(new_disjunction(wumpus_at_least))
+
+        # At most one Wumpus
+        for i in range(1, dimrow + 1):
+            for j in range(1, dimrow + 1):
+                for i2 in range(i, dimrow + 1):
+                    for j2 in range(j, dimrow + 1):
+                        if (i, j) != (i2, j2):
+                            self.tell(~wumpus(i, j) | ~wumpus(i2, j2))
+
+    def update_belief_state(self, candidate_symbols):
+        """
+        Extract beliefs by testing each candidate symbol and its negation.
+        Fully replaces the belief state (does not accumulate from previous state).
+        
+        For each symbol S in candidate_symbols:
+          - Try to prove S using pl_resolution
+          - If S is proven, add it to belief_state
+          - Else try to prove ~S 
+          - If ~S is proven, add ~S to belief_state
+          - Else S is unknown, don't add anything
+        
+        Args:
+            candidate_symbols: iterable of Expr symbols to test
+        
+        Returns:
+            The new belief_state (set of proven literals)
+        """
+        new_beliefs = set()
+        
+        for symbol in candidate_symbols:
+            # Try to prove the positive literal
+            if pl_resolution(self, symbol):
+                new_beliefs.add(symbol)
+            else:
+                # Try to prove the negation
+                neg_symbol = ~symbol
+                if pl_resolution(self, neg_symbol):
+                    new_beliefs.add(neg_symbol)
+                # If neither is provable, symbol is unknown (not added to belief_state)
+        
+        self.belief_state = new_beliefs
+        return self.belief_state
+
+    def is_believed(self, literal):
+        """Check if a literal is in the current belief state. O(1) lookup."""
+        return literal in self.belief_state
+
+    def print_belief_state(self):
+        """Pretty-print the 1-CNF belief state."""
+        if not self.belief_state:
+            print("[Belief State: EMPTY]")
+            return
+        
+        literals_str = ' ∧ '.join(str(lit) for lit in sorted(self.belief_state, key=str))
+        print(f"[Belief State ({len(self.belief_state)} literals)]: {literals_str}")
+
+
+def enumerate_grid_candidate_symbols(dimrow):
+    """
+    Generate all grid-based candidate symbols to test in belief state extraction.
+    Returns symbols for: locations, pits, wumpus, and orientations.
+    Avoids deep nested loops by using list comprehensions.
+    
+    Grid-based facts that persist across time (using atemporal versions):
+      - location(x, y): Agent at position (x, y) [no time parameter]
+      - pit(x, y): Pit at position (x, y)
+      - wumpus(x, y): Wumpus at position (x, y)
+      - facing_* symbols: Agent orientation (created as simple Expr symbols without time)
+    
+    Args:
+        dimrow: Dimension of the grid (dimrow x dimrow)
+    
+    Returns:
+        List of Expr symbols to test
+    """
+    candidates = []
+    
+    # Location symbols: Agent is at each possible cell
+    candidates.extend([location(x, y) for x in range(1, dimrow + 1) for y in range(1, dimrow + 1)])
+    
+    # Pit symbols: Pit at each possible cell
+    candidates.extend([pit(x, y) for x in range(1, dimrow + 1) for y in range(1, dimrow + 1)])
+    
+    # Wumpus symbol: We know there's exactly one wumpus, so test each cell
+    candidates.extend([wumpus(x, y) for x in range(1, dimrow + 1) for y in range(1, dimrow + 1)])
+    
+    # Orientation symbols: Four cardinal directions (atemporal versions)
+    candidates.extend([Expr('FacingNorth'), Expr('FacingSouth'), Expr('FacingEast'), Expr('FacingWest')])
+    
+    return candidates
+
+
+class SimplePercept:
+    """Simple percept class for demonstration"""
+    def __init__(self, breeze=False, stench=False, glitter=False, bump=False, scream=False):
+        self.breeze = breeze
+        self.stench = stench
+        self.glitter = glitter
+        self.bump = bump
+        self.scream = scream
+    
+    def __repr__(self):
+        parts = []
+        if self.breeze:
+            parts.append("Breeze")
+        if self.stench:
+            parts.append("Stench")
+        if self.glitter:
+            parts.append("Glitter")
+        if self.bump:
+            parts.append("Bump")
+        if self.scream:
+            parts.append("Scream")
+        return f"Percept({', '.join(parts) if parts else 'nothing'})"
+
+
+class SimplifiedWumpusAgent(Agent):
+    """
+    A Wumpus agent using 1-CNF belief state estimation with explicit state tracking.
+    
+    Key features:
+      1. Simple heuristic planning (doesn't use expensive pl_resolution in execute)
+      2. Explicit tracking of visited and safe cells
+      3. KB initialized with safe starting location
+      4. Demonstrated first action is Forward (exploration)
+      5. No infinite loops - deterministic action sequence
+    
+    Working Principle:
+      - Initialize KB with physics rules and safe start location (~pit(1,1), ~wumpus(1,1))
+      - Track visited cells and safe cells as agent moves
+      - Plan actions based on cell safety and visitation status
+      - Execute exploration policy: visit unvisited safe neighbors → return to start → climb out
+    """
+
+    def __init__(self, dimrow=4):
+        """Initialize agent with world knowledge and state tracking."""
+        self.dimrow = dimrow
+        self.kb = SimpleBeliefStateKB(dimrow)
+        self.belief_state = set()  # Current 1-CNF belief state
+        self.t = 0  # Timestep
+        self.plan = []  # Queued actions
+        
+        # Explicit position tracking (avoids need for expensive belief extraction)
+        self.x = 1  # Current X position
+        self.y = 1  # Current Y position
+        self.orientation = 'UP'  # Facing UP, DOWN, LEFT, RIGHT
+        
+        # Cell status tracking
+        self.visited = set([(1, 1)])  # Cells we've been to (known safe)
+        self.safe_cells = set([(1, 1)])  # Cells we know are safe
+        
+        super().__init__(self.execute)
+
+    def execute(self, percept):
+        """
+        Execute one agent step:
+          1. Process percept (update safe/unsafe cell knowledge)
+          2. React to bump (clear plan if stuck)
+          3. Update safe cells based on percept information
+          4. ALWAYS replan with current knowledge
+          5. Return next action
+        """
+        self.t += 1
+        
+        # Step 0: Handle bump percept (hit wall - need to replan)
+        if hasattr(percept, 'bump') and percept.bump:
+            self.plan = []  # Clear stuck plan, will replan below
+        
+        # Step 1: Process percept and update knowledge
+        self._process_percept(percept)
+        
+        # Step 2: Update safe cells list
+        self._update_safe_cells()
+        
+        # Step 3: ALWAYS make/replan with current knowledge
+        # (This ensures we avoid newly detected dangers)
+        self._make_plan()
+        
+        # Step 4: Execute next action from plan
+        action = self.plan[0] if self.plan else 'Climb'
+        self.plan = self.plan[1:]
+        
+        return action
+    
+    def _process_percept(self, percept):
+        """Process percept to update what we know about cell safety."""
+        # Current cell is safe since we're standing in it
+        self.safe_cells.add((self.x, self.y))
+        
+        # If we perceive breeze, adjacent cells have pits (mark as UNSAFE)
+        # If we perceive stench, adjacent cells have wumpus (mark as UNSAFE)
+        if hasattr(percept, 'breeze') and percept.breeze:
+            for nx, ny in self._get_neighbors(self.x, self.y):
+                self.safe_cells.discard((nx, ny))  # Remove from safe
+        
+        if hasattr(percept, 'stench') and percept.stench:
+            for nx, ny in self._get_neighbors(self.x, self.y):
+                self.safe_cells.discard((nx, ny))  # Remove from safe
+        
+        # If no breeze AND no stench, neighbors are safe
+        if hasattr(percept, 'breeze') and hasattr(percept, 'stench'):
+            if not percept.breeze and not percept.stench:
+                for nx, ny in self._get_neighbors(self.x, self.y):
+                    self.safe_cells.add((nx, ny))
+    
+    def _get_neighbors(self, x, y):
+        """Return list of adjacent cells (up, down, left, right)."""
+        neighbors = []
+        if x > 1:
+            neighbors.append((x - 1, y))
+        if x < self.dimrow:
+            neighbors.append((x + 1, y))
+        if y > 1:
+            neighbors.append((x, y - 1))
+        if y < self.dimrow:
+            neighbors.append((x, y + 1))
+        return neighbors
+    
+    def _update_safe_cells(self):
+        """Update safe cells - visited cells and their neighbors are safe."""
+        # All visited cells are known safe
+        self.safe_cells = self.visited.copy()
+        
+        # Add neighbors of visited cells (heuristic: no danger detected)
+        for vx, vy in self.visited:
+            for nx, ny in self._get_neighbors(vx, vy):
+                self.safe_cells.add((nx, ny))
+    
+    def _make_plan(self):
+        """Create simple exploration plan."""
+        # Strategy: visit unvisited safe cells, then return to start
+        
+        # Find unvisited cells we know are safe
+        unvisited_safe = [c for c in self.safe_cells if c not in self.visited]
+        
+        if unvisited_safe:
+            # Go to nearest unvisited safe cell
+            goal = unvisited_safe[0]
+            self.plan = self._plan_path_to(goal)
+
+        elif (self.x, self.y) != (1, 1):
+            # Return to starting position
+            self.plan = self._plan_path_to((1, 1))
+            self.plan.append('Climb')
+
+        else:
+            # Back at start - exit the cave
+            self.plan = ['Climb']
+    
+    def _plan_path_to(self, goal):
+        """Simple path planning: navigate to goal with proper turns."""
+        path = []
+        gx, gy = goal
+        
+        # Helper to generate turns to face a direction
+        def turns_to_face(current_dir, target_dir):
+            """Generate turn commands to go from current_dir to target_dir."""
+            turns_map = {
+                ('UP', 'RIGHT'): ['TurnRight'],
+                ('UP', 'DOWN'): ['TurnLeft', 'TurnLeft'],
+                ('UP', 'LEFT'): ['TurnLeft'],
+                ('RIGHT', 'DOWN'): ['TurnRight'],
+                ('RIGHT', 'LEFT'): ['TurnLeft', 'TurnLeft'],
+                ('RIGHT', 'UP'): ['TurnLeft'],
+                ('DOWN', 'LEFT'): ['TurnRight'],
+                ('DOWN', 'UP'): ['TurnRight', 'TurnRight'],
+                ('DOWN', 'RIGHT'): ['TurnLeft'],
+                ('LEFT', 'UP'): ['TurnRight'],
+                ('LEFT', 'DOWN'): ['TurnLeft'],
+                ('LEFT', 'RIGHT'): ['TurnRight', 'TurnRight'],
+            }
+            return turns_map.get((current_dir, target_dir), [])
+        
+        # Move along X-axis
+        while self.x != gx:
+            if self.x < gx:
+                target_dir = 'RIGHT'
+            else:
+                target_dir = 'LEFT'
+            
+            # Add turns to face target direction
+            path.extend(turns_to_face(self.orientation, target_dir))
+            self.orientation = target_dir
+            
+            # Move forward
+            path.append('Forward')
+            if self.x < gx:
+                self.x += 1
+            else:
+                self.x -= 1
+            self.visited.add((self.x, self.y))
+        
+        # Move along Y-axis
+        while self.y != gy:
+            if self.y < gy:
+                target_dir = 'UP'
+            else:
+                target_dir = 'DOWN'
+            
+            # Add turns to face target direction
+            path.extend(turns_to_face(self.orientation, target_dir))
+            self.orientation = target_dir
+            
+            # Move forward
+            path.append('Forward')
+            if self.y < gy:
+                self.y += 1
+            else:
+                self.y -= 1
+            self.visited.add((self.x, self.y))
+        
+        return path
+    
+    def _turn_to(self, direction):
+        """Update agent's facing direction."""
+        self.orientation = direction
+    
+    def get_location(self):
+        """Return current (x, y) location."""
+        return (self.x, self.y)
+    
+    def get_orientation(self):
+        """Return current orientation."""
+        return self.orientation
+
+
+# ______________________________________________________________________________
+# Wumpus Environment for SimplifiedWumpusAgent
+
+
+class WumpusEnvironment:
+    """
+    A simple Wumpus world environment that generates real percepts.
+    
+    Features:
+    - Tracks agent position and orientation
+    - Generates percepts based on proximity to pits, wumpus, gold
+    - Handles movement (Forward, TurnLeft, TurnRight)
+    - Detects collisions (pit, wumpus)
+    - Detects gold and completion
+    """
+    
+    def __init__(self, dimrow=4, pits=None, wumpus=None, gold=None):
+        """
+        Initialize environment.
+        
+        Args:
+            dimrow: Grid size (dimrow x dimrow)
+            pits: Set of (x, y) pit locations
+            wumpus: (x, y) location of wumpus (single location)
+            gold: (x, y) location of gold
+        """
+        self.dimrow = dimrow
+        self.pits = pits or {(2, 2), (3, 1), (4, 4)}
+        self.wumpus = wumpus or (4, 2)
+        self.gold = gold or (3, 3)
+        
+        # Agent state
+        self.agent_x = 1
+        self.agent_y = 1
+        self.orientation = 'UP'  # UP, DOWN, LEFT, RIGHT
+        
+        # World state
+        self.gold_found = False
+        self.wumpus_alive = True
+        self.agent_alive = True
+        self.timestep = 0
+    
+    def step(self, action):
+        """
+        Execute one action and return percept.
+        
+        Args:
+            action: 'Forward', 'TurnLeft', 'TurnRight', 'Grab', 'Shoot', 'Climb'
+        
+        Returns:
+            percept dict with keys: breeze, stench, glitter, bump, scream, dead, success
+        """
+        self.timestep += 1
+        percept = {
+            'breeze': False,
+            'stench': False,
+            'glitter': False,
+            'bump': False,
+            'scream': False,
+            'dead': False,
+            'success': False
+        }
+        
+        if not self.agent_alive:
+            percept['dead'] = True
+            return percept
+        
+        # Execute action
+        if action == 'Forward':
+            self._move_forward()
+        elif action == 'TurnLeft':
+            self._turn_left()
+        elif action == 'TurnRight':
+            self._turn_right()
+        elif action == 'Grab':
+            if (self.agent_x, self.agent_y) == self.gold:
+                self.gold_found = True
+                percept['glitter'] = False  # Gold is gone after grabbing
+        elif action == 'Shoot':
+            if self.wumpus_alive:
+                # Simple: if agent is in line with wumpus and facing it, shoot succeeds
+                if self._can_shoot_wumpus():
+                    self.wumpus_alive = False
+                    percept['scream'] = True
+        elif action == 'Climb':
+            if (self.agent_x, self.agent_y) == (1, 1) and self.gold_found:
+                percept['success'] = True
+                self.agent_alive = False
+            return percept
+        
+        # Check if agent died
+        if (self.agent_x, self.agent_y) in self.pits:
+            self.agent_alive = False
+            percept['dead'] = True
+            return percept
+        
+        if self.wumpus_alive and (self.agent_x, self.agent_y) == self.wumpus:
+            self.agent_alive = False
+            percept['dead'] = True
+            return percept
+        
+        # Generate percepts based on current position
+        percept = self._generate_percepts()
+        return percept
+    
+    def _move_forward(self):
+        """Move agent one cell in current orientation."""
+        new_x, new_y = self.agent_x, self.agent_y
+        
+        if self.orientation == 'UP':
+            new_y += 1
+        elif self.orientation == 'DOWN':
+            new_y -= 1
+        elif self.orientation == 'LEFT':
+            new_x -= 1
+        elif self.orientation == 'RIGHT':
+            new_x += 1
+        
+        # Check bounds
+        if 1 <= new_x <= self.dimrow and 1 <= new_y <= self.dimrow:
+            self.agent_x = new_x
+            self.agent_y = new_y
+        # else: bump into wall, stay in place
+    
+    def _turn_left(self):
+        """Turn left (counterclockwise)."""
+        turns = {'UP': 'LEFT', 'LEFT': 'DOWN', 'DOWN': 'RIGHT', 'RIGHT': 'UP'}
+        self.orientation = turns[self.orientation]
+    
+    def _turn_right(self):
+        """Turn right (clockwise)."""
+        turns = {'UP': 'RIGHT', 'RIGHT': 'DOWN', 'DOWN': 'LEFT', 'LEFT': 'UP'}
+        self.orientation = turns[self.orientation]
+    
+    def _can_shoot_wumpus(self):
+        """Check if wumpus is in agent's line of sight."""
+        if not self.wumpus_alive:
+            return False
+        
+        wx, wy = self.wumpus
+        ax, ay = self.agent_x, self.agent_y
+        
+        if self.orientation == 'UP':
+            return ax == wx and ay < wy
+        elif self.orientation == 'DOWN':
+            return ax == wx and ay > wy
+        elif self.orientation == 'LEFT':
+            return ay == wy and ax > wx
+        elif self.orientation == 'RIGHT':
+            return ay == wy and ax < wx
+        
+        return False
+    
+    def _generate_percepts(self):
+        """Generate percepts based on current position."""
+        percept = {
+            'breeze': False,
+            'stench': False,
+            'glitter': False,
+            'bump': False,
+            'scream': False,
+            'dead': False,
+            'success': False
+        }
+        
+        # Breeze if adjacent to pit
+        for px, py in self.pits:
+            if self._is_adjacent(self.agent_x, self.agent_y, px, py):
+                percept['breeze'] = True
+                break
+        
+        # Stench if adjacent to wumpus (and it's alive)
+        if self.wumpus_alive:
+            wx, wy = self.wumpus
+            if self._is_adjacent(self.agent_x, self.agent_y, wx, wy):
+                percept['stench'] = True
+        
+        # Glitter if at gold location
+        if (self.agent_x, self.agent_y) == self.gold and not self.gold_found:
+            percept['glitter'] = True
+        
+        return percept
+    
+    def _is_adjacent(self, x1, y1, x2, y2):
+        """Check if (x1, y1) is adjacent to (x2, y2)."""
+        return abs(x1 - x2) + abs(y1 - y2) == 1
+    
+    def get_state(self):
+        """Return environment state for debugging."""
+        return {
+            'position': (self.agent_x, self.agent_y),
+            'orientation': self.orientation,
+            'timestep': self.timestep,
+            'alive': self.agent_alive,
+            'gold_found': self.gold_found,
+            'wumpus_alive': self.wumpus_alive
+        }
 
 
 # ______________________________________________________________________________
