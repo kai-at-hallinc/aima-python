@@ -48,7 +48,7 @@ class KB:
     """
     A knowledge base to which you can tell and ask sentences.
     To create a KB, subclass this class and implement tell, ask_generator, and retract.
-    Ask_generator：
+    Ask_generator:
       For a Propositional Logic KB, ask(P & Q) returns True or False, but for an
       FOL KB, something like ask(Brother(x, y)) might return many substitutions
       such as {x: Cain, y: Abel}, {x: Abel, y: Cain}, {x: George, y: Jeb}, etc.
@@ -823,9 +823,8 @@ def dpll_satisfiable(s):
     rather than True when it succeeds; this is more useful. (2) The
     function find_pure_symbol is passed a list of unknown clauses, rather
     than a list of all clauses and the model; this is more efficient.
-    >>> dpll_satisfiable(A |'<=>'| B) == {A: True, B: True}
-    True
-    """
+    dpll_satisfiable(A |'<=>'| B) == {A: True, B: True}
+    True"""
     clauses = conjuncts(to_cnf(s))
     symbols = list(prop_symbols(s))
     return dpll(clauses, symbols, {})
