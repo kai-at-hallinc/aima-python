@@ -265,7 +265,7 @@ def breadth_first_graph_search(problem):
     return None
 
 
-def best_first_graph_search(problem, f, display=False):
+def best_first_graph_search(problem, f, display=True):
     """Search the nodes with the lowest f scores first.
     You specify the function f(node) that you want to minimize; for example,
     if f is a heuristic estimate to the goal, then we have greedy best

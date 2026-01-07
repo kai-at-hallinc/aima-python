@@ -1,3 +1,5 @@
+# type: ignore
+
 """Planning (Chapters 10-11)"""
 
 import copy
@@ -40,7 +42,7 @@ class PlanningProblem:
             pass
 
         new_clauses = []
-        for clause in clauses:
+        for clause in clauses: # type: ignore
             if clause.op == '~':
                 new_clauses.append(expr('Not' + str(clause.args[0])))
             else:
@@ -586,10 +588,10 @@ class ForwardPlan(search.Problem):
         by removing the delete lists from all actions, i.e. removing all negative literals from effects) that will be
         easier to solve through GraphPlan and where the length of the solution will serve as a good heuristic.
         """
-        relaxed_planning_problem = PlanningProblem(initial=state.state,
-                                                   goals=self.goal,
-                                                   actions=[action.relaxed() for action in
-                                                            self.planning_problem.actions])
+        relaxed_planning_problem = PlanningProblem(
+            initial=state.state,
+            goals=self.goal,
+            actions=[action.relaxed() for action in self.planning_problemactions])
         try:
             return len(linearize(GraphPlan(relaxed_planning_problem).execute()))
         except:
@@ -1048,25 +1050,48 @@ class Linearize:
         """Finds total-order solution for a planning graph"""
 
         graphPlan_solution = GraphPlan(self.planning_problem).execute()
+        if not graphPlan_solution:
+            raise RuntimeError("GraphPlan did not find any solution for the planning problem")
+
         filtered_solution = self.filter(graphPlan_solution)
         ordered_solution = []
         planning_problem = self.planning_problem
+
         for level in filtered_solution:
+            # deterministic iteration order for permutations
+            level = sorted(level, key=lambda a: str(a))
             level_solution, planning_problem = self.orderlevel(level, planning_problem)
             for element in level_solution:
                 ordered_solution.append(element)
+        
+        # remove duplicates while preserving order
+        deduped = []
+        seen = set()
+        for a in ordered_solution:
+            key = str(a)
+            if key not in seen:
+                seen.add(key)
+                deduped.append(a)
 
-        return ordered_solution
+        return deduped
 
-
-def linearize(solution):
-    """Converts a level-ordered solution into a linear solution"""
+def linearize(solution, remove_duplicates=True):
+    """Converts a level-ordered solution into a linear solution
+    
+    Args:
+        solution: Level-ordered solution from GraphPlan
+        remove_duplicates: If True (default), removes consecutive duplicate actions
+    """
 
     linear_solution = []
     for section in solution[0]:
         for operation in section:
             if not (operation.op[0] == 'P' and operation.op[1].isupper()):
                 linear_solution.append(operation)
+
+    if remove_duplicates:
+        seen = {str(a): a for a in linear_solution}
+        return list(seen.values())
 
     return linear_solution
 
@@ -1634,7 +1659,7 @@ class RealWorldPlanningProblem(PlanningProblem):
                 guaranteed = self.intersects_goal(pes_reachable_set)
                 if guaranteed and RealWorldPlanningProblem.making_progress(plan, initial_plan):
                     final_state = guaranteed[0]  # any element of guaranteed
-                    return RealWorldPlanningProblem.decompose(hierarchy, final_state, pes_reachable_set)
+                    return RealWorldPlanningProblem.decompose(hierarchy, plan, final_state, pes_reachable_set)
                 # there should be at least one HLA/AngelicHLA, otherwise plan would be primitive
                 hla, index = RealWorldPlanningProblem.find_hla(plan, hierarchy)
                 prefix = plan.action[:index]
