@@ -1,0 +1,14 @@
+{
+    "chat.mcp.serverSampling": {
+        "aima-python/.vscode/mcp.json: databricks/mcp": {
+            "allowedModels": [
+                "copilot/auto",
+                "claude-code/claude-sonnet-4.6",
+                "copilotcli/claude-sonnet-4.6",
+                "claude-code/claude-haiku-4.5",
+                "copilot/claude-haiku-4.5",
+                "copilotcli/claude-haiku-4.5"
+            ]
+        }
+    }
+}
