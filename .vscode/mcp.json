@@ -13,7 +13,7 @@
 				"C:\\Users\\BYCLADM\\ai-dev-kit\\databricks-mcp-server\\run_server.py"
 			],
 			"env": {
-				"DATABRICKS_CONFIG_PROFILE": "dev"
+				"DATABRICKS_CONFIG_PROFILE": "DEFAULT"
 			}
 		}
 	},
