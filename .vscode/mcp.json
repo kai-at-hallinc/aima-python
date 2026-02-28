@@ -7,7 +7,6 @@
 			"version": "1.0.0"
 		},
 		"databricks/mcp": {
-			"type": "stdio",
 			"command": "C:\\Users\\BYCLADM\\ai-dev-kit\\databricks-mcp-server\\.venv\\Scripts\\python.exe",
 			"args": [
 				"C:\\Users\\BYCLADM\\ai-dev-kit\\databricks-mcp-server\\run_server.py"
