@@ -505,11 +505,13 @@ def all_events(variables, bn, e):
 # [Figure 14.12a]: sprinkler network
 
 
-sprinkler = BayesNet([('Cloudy', '', 0.5),
-                      ('Sprinkler', 'Cloudy', {T: 0.10, F: 0.50}),
-                      ('Rain', 'Cloudy', {T: 0.80, F: 0.20}),
-                      ('WetGrass', 'Sprinkler Rain',
-                       {(T, T): 0.99, (T, F): 0.90, (F, T): 0.90, (F, F): 0.00})])
+sprinkler = BayesNet(
+    [('Cloudy', '', 0.5),
+    ('Sprinkler', 'Cloudy', {T: 0.10, F: 0.50}),
+    ('Rain', 'Cloudy', {T: 0.80, F: 0.20}),
+    ('WetGrass', 'Sprinkler Rain',
+    {(T, T): 0.99, (T, F): 0.90, (F, T): 0.90, (F, F): 0.00})]
+)
 
 
 # ______________________________________________________________________________

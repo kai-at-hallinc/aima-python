@@ -512,7 +512,7 @@ def LinearLearner(dataset, learning_rate=0.01, epochs=100):
     num_examples = len(examples)
 
     # X transpose
-    X_col = [dataset.values[i] for i in idx_i]  # vertical columns of X
+    X_col = [[example[i] for example in examples] for i in idx_i]  # vertical columns of X
 
     # add dummy
     ones = [1 for _ in range(len(examples))]
@@ -526,7 +526,7 @@ def LinearLearner(dataset, learning_rate=0.01, epochs=100):
         err = []
         # pass over all examples
         for example in examples:
-            x = [1] + example
+            x = [1] + example[:-1]
             y = np.dot(w, x)
             t = example[idx_t]
             err.append(t - y)
@@ -722,8 +722,10 @@ def BackPropagationLearner(dataset, net, learning_rate, epochs, activation=sigmo
                 inc = [node.value for node in net[i - 1]]
                 units = len(layer)
                 for j in range(units):
-                    layer[j].weights = vector_add(layer[j].weights,
-                                                  scalar_vector_product(learning_rate * delta[i][j], inc))
+                    layer[j].weights = vector_add(
+                        layer[j].weights,
+                        scalar_vector_product(learning_rate * delta[i][j], inc)
+                    )
 
     return net
 
@@ -1036,6 +1038,14 @@ def ada_boost(dataset, L, K):
         w = normalize(w)
         z.append(np.log((1 - error) / error))
     return weighted_majority(h, z)
+
+
+def AdaBoost(L, K):
+    """Curried AdaBoost: takes weak learner L and number of rounds K,
+    returns a train(dataset) function."""
+    def train(dataset):
+        return ada_boost(dataset, L, K)
+    return train
 
 
 def weighted_majority(predictors, weights):

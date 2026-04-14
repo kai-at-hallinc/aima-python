@@ -434,8 +434,18 @@ class NeuralNetworkLearner:
     :param hidden_layer_sizes: size of hidden layers in the form of a list
     """
 
-    def __init__(self, dataset, hidden_layer_sizes, l_rate=0.01, epochs=1000, batch_size=10,
-                 optimizer=stochastic_gradient_descent, loss=mean_squared_error_loss, verbose=False, plot=False):
+    def __init__(
+        self,
+        dataset,
+        hidden_layer_sizes,
+        l_rate=0.01,
+        epochs=1000,
+        batch_size=10,
+        optimizer=stochastic_gradient_descent,
+        loss=mean_squared_error_loss,
+        verbose=False,
+        plot=False
+    ):
         self.dataset = dataset
         self.l_rate = l_rate
         self.epochs = epochs
@@ -449,7 +459,7 @@ class NeuralNetworkLearner:
         output_size = len(dataset.values[dataset.target])
 
         # initialize the network
-        raw_net = [InputLayer(input_size)]
+        raw_net:list[InputLayer | DenseLayer] = [InputLayer(input_size)]
         # add hidden layers
         hidden_input_size = input_size
         for h_size in hidden_layer_sizes:
@@ -459,8 +469,15 @@ class NeuralNetworkLearner:
         self.raw_net = raw_net
 
     def fit(self, X, y):
-        self.learned_net = self.optimizer(self.dataset, self.raw_net, loss=self.loss, epochs=self.epochs,
-                                          l_rate=self.l_rate, batch_size=self.batch_size, verbose=self.verbose)
+        self.learned_net = self.optimizer(
+            self.dataset,
+            self.raw_net,
+            loss=self.loss,
+            epochs=self.epochs,
+            l_rate=self.l_rate,
+            batch_size=self.batch_size,
+            verbose=self.verbose
+        )
         return self
 
     def predict(self, example):
@@ -482,8 +499,17 @@ class PerceptronLearner:
     Simple perceptron neural network.
     """
 
-    def __init__(self, dataset, l_rate=0.01, epochs=1000, batch_size=10, optimizer=stochastic_gradient_descent,
-                 loss=mean_squared_error_loss, verbose=False, plot=False):
+    def __init__(
+        self,
+        dataset,
+        l_rate=0.01,
+        epochs=1000,
+        batch_size=10,
+        optimizer=stochastic_gradient_descent,
+        loss=mean_squared_error_loss,
+        verbose=False,
+        plot=False
+    ):
         self.dataset = dataset
         self.l_rate = l_rate
         self.epochs = epochs
@@ -497,11 +523,18 @@ class PerceptronLearner:
         output_size = len(dataset.values[dataset.target])
 
         # initialize the network, add dense layer
-        self.raw_net = [InputLayer(input_size), DenseLayer(input_size, output_size)]
+        self.raw_net:list[InputLayer | DenseLayer] = [InputLayer(input_size), DenseLayer(input_size, output_size)]
 
     def fit(self, X, y):
-        self.learned_net = self.optimizer(self.dataset, self.raw_net, loss=self.loss, epochs=self.epochs,
-                                          l_rate=self.l_rate, batch_size=self.batch_size, verbose=self.verbose)
+        self.learned_net = self.optimizer(
+            self.dataset,
+            self.raw_net,
+            loss=self.loss,
+            epochs=self.epochs,
+            l_rate=self.l_rate,
+            batch_size=self.batch_size,
+            verbose=self.verbose
+        )
         return self
 
     def predict(self, example):
